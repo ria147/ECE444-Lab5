@@ -1,4 +1,4 @@
-from flask import Flask 
+from flask import Flask, render_template, request, session
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 import pickle
@@ -6,33 +6,49 @@ import pickle
 # Initialize the Flask application
 application = Flask(__name__) 
 
+# Load application configurations
+application.config.from_object(__name__)
+
+# Basic model loading
+def load_model():
+    loaded_model = None
+    with open('basic_classifier.pkl', 'rb') as fid:
+        loaded_model = pickle.load(fid)
+    return loaded_model
+
+# Count vectorizer model loading
+def load_vectorizer():
+    vectorizer = None
+    with open('count_vectorizer.pkl', 'rb') as vd:
+        vectorizer = pickle.load(vd)
+    return vectorizer
+
+# Make Predictions
+def predict(loaded_model, vectorizer, string):
+    # check if input string is valid
+    if type(string) == str:
+        # use model to predict
+        prediction = loaded_model.predict(vectorizer.transform([string]))[0]
+
+        # output prediction mapping
+        if prediction == "REAL" or prediction == "FAKE":
+            return prediction
+
+    return "INVALID INPUT"
+
+model = load_model()
+vectorizer = load_vectorizer()
+
 # Index
-@application.route('/')
-def home():
-    return 'Welcome to Fake News Classifier!'
-
-# Model loading
-loaded_model = None
-with open('basic_classifier.pkl', 'rb') as fid:
-    loaded_model = pickle.load(fid)
-
-vectorizer = None
-with open('count_vectorizer.pkl', 'rb') as vd:
-    vectorizer = pickle.load(vd)
-
-# Prediction
-@application.route('/predict')
-def predict():
-    prediction = loaded_model.predict(vectorizer.transform(['This is fake news']))[0]
-
-    # Output will be 'FAKE' if fake, 'REAL' if real
-    if prediction == 1:
-        print("FAKE")
-    else:
-        print("REAL")
+@application.route("/", methods=["GET"])
+def index():
+    headline = request.args.get("query")
+    prediction = None
+    if headline != None:
+        prediction = predict(model, vectorizer, headline)
+        return render_template("index.html", headline=headline, prediction=prediction)
+    return render_template("index.html")
 
 # Start the Flask app
 if __name__ == '__main__':
-    # In this simple example, there is no Flask route to handle requests
-    # Just add this line to follow the structure in Figure 12
-    application.run(host="0.0.0.0", port=8080)
+    application.run(port=5000, debug=True)
